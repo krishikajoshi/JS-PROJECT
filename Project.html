@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Speech-to-Text Pad</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: #F5EFE6;
+      color: #333;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+
+    .app {
+      margin: 2rem 1rem;
+      padding: 1.8rem;
+      max-width: 700px;
+      width: 100%;
+      background: #E8DFCA;
+      border-radius: 1rem;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+      border: 1px solid #CBDCEB;
+    }
+
+    h1 {
+      margin-top: 0;
+      margin-bottom: 0.25rem;
+      font-size: 1.8rem;
+      color: #6D94C5;
+    }
+
+    .subtitle {
+      margin-top: 0;
+      margin-bottom: 1.25rem;
+      font-size: 0.9rem;
+      color: #555;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      resize: vertical;
+      padding: 0.75rem;
+      border-radius: 0.75rem;
+      border: 1px solid #CBDCEB;
+      background: #fff;
+      color: #333;
+      outline: none;
+      font-size: 0.95rem;
+    }
+
+    textarea:focus {
+      border-color: #6D94C5;
+      box-shadow: 0 0 0 1px #6D94C5;
+    }
+
+    .controls {
+      margin-top: 0.75rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    button {
+      border-radius: 999px;
+      border: none;
+      padding: 0.5rem 1.1rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: 0.15s ease;
+    }
+
+    .btn-start {
+      background: #6D94C5;
+      color: white;
+    }
+    .btn-start:hover:not(:disabled) {
+      background: #587fad;
+    }
+
+    .btn-stop {
+      background: #ef4444;
+      color: white;
+    }
+    .btn-stop:hover:not(:disabled) {
+      background: #dc2626;
+    }
+
+    .btn-save {
+      background: #CBDCEB;
+      color: #333;
+      font-weight: 600;
+    }
+    .btn-save:hover:not(:disabled) {
+      background: #b7cbe0;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .status {
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: #444;
+      min-height: 1rem;
+    }
+
+    .status span.dot {
+      height: 9px;
+      width: 9px;
+      border-radius: 999px;
+      display: inline-block;
+      margin-right: 0.35rem;
+    }
+
+    .status.listening span.dot {
+      background: #6D94C5;
+    }
+
+    .status.idle span.dot {
+      background: #999;
+    }
+
+    .status.error span.dot {
+      background: #ef4444;
+    }
+
+    h2 {
+      margin-top: 1.75rem;
+      font-size: 1.1rem;
+      border-top: 1px solid #CBDCEB;
+      padding-top: 1rem;
+      color: #6D94C5;
+    }
+
+    #notesList {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .note {
+      padding: 0.65rem 0.75rem;
+      border-radius: 0.75rem;
+      background: #fff;
+      border: 1px solid #CBDCEB;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+
+    .note small {
+      display: block;
+      margin-bottom: 0.3rem;
+      font-size: 0.75rem;
+      color: #666;
+    }
+
+    .empty-state {
+      font-size: 0.85rem;
+      color: #777;
+    }
+
+    .unsupported {
+      margin-top: 0.75rem;
+      padding: 0.85rem;
+      border-radius: 0.75rem;
+      background: #f9d6d6;
+      color: #a11;
+      border: 1px solid #ef4444;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <h1>🎙️ Speech-to-Text Pad</h1>
+    <p class="subtitle">Click Start, speak, watch your words turn into text, then save them as notes.</p>
+
+    <textarea id="transcript" placeholder="Your speech will appear here..."></textarea>
+
+    <div class="controls">
+      <button id="startBtn" class="btn-start">▶ Start Listening</button>
+      <button id="stopBtn" class="btn-stop" disabled>⏹ Stop Listening</button>
+      <button id="saveBtn" class="btn-save" disabled>💾 Save Note</button>
+    </div>
+
+    <div id="status" class="status idle">
+      <span class="dot"></span>
+      <span class="text">Idle</span>
+    </div>
+
+    <div id="unsupported" class="unsupported" style="display: none;">
+      Your browser doesn't support SpeechRecognition. Use Chrome.
+    </div>
+
+    <h2>📝 Saved Notes</h2>
+    <ul id="notesList">
+      <li class="empty-state">No notes yet. Speak something and save it!</li>
+    </ul>
+  </div>
+
+  <script>
+    const transcriptEl = document.getElementById("transcript");
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const saveBtn = document.getElementById("saveBtn");
+    const statusEl = document.getElementById("status");
+    const statusTextEl = statusEl.querySelector(".text");
+    const notesList = document.getElementById("notesList");
+    const unsupportedEl = document.getElementById("unsupported");
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+    let finalTranscript = "";
+
+    if (!SpeechRecognition) {
+      unsupportedEl.style.display = "block";
+      startBtn.disabled = true;
+      stopBtn.disabled = true;
+      saveBtn.disabled = true;
+      setStatus("Not supported", "error");
+    } else {
+      recognition = new SpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        setStatus("Listening…", "listening");
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+      };
+
+      recognition.onend = () => {
+        setStatus("Stopped", "idle");
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+      };
+
+      recognition.onerror = (e) => {
+        setStatus("Error: " + e.error, "error");
+      };
+
+      recognition.onresult = (event) => {
+        let interim = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          let text = event.results[i][0].transcript;
+          if (event.results[i].isFinal) finalTranscript += text + " ";
+          else interim += text;
+        }
+        transcriptEl.value = finalTranscript + interim;
+        saveBtn.disabled = transcriptEl.value.trim().length === 0;
+      };
+    }
+
+    function setStatus(text, mode) {
+      statusEl.classList.remove("idle", "listening", "error");
+      statusEl.classList.add(mode);
+      statusTextEl.textContent = text;
+    }
+
+    if (SpeechRecognition) {
+      startBtn.addEventListener("click", () => {
+        finalTranscript = transcriptEl.value + " ";
+        recognition.start();
+      });
+
+      stopBtn.addEventListener("click", () => recognition.stop());
+    }
+
+    saveBtn.addEventListener("click", () => {
+      const noteText = transcriptEl.value.trim();
+      if (!noteText) return;
+
+      const first = notesList.firstElementChild;
+      if (first && first.classList.contains("empty-state")) first.remove();
+
+      const li = document.createElement("li");
+      li.className = "note";
+
+      const time = document.createElement("small");
+      time.textContent = new Date().toLocaleString();
+
+      const textDiv = document.createElement("div");
+      textDiv.textContent = noteText;
+
+      li.appendChild(time);
+      li.appendChild(textDiv);
+      notesList.appendChild(li);
+
+      transcriptEl.value = "";
+      finalTranscript = "";
+      saveBtn.disabled = true;
+    });
+  </script>
+</body>
+</html>
